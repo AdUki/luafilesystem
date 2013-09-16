@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <limits.h>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -104,22 +105,26 @@ typedef struct dir_data {
 #define LOCK_METATABLE "lock metatable"
 
 #ifdef _WIN32
- #ifdef __BORLANDC__
-  #define lfs_setmode(L,file,m)   ((void)L, setmode(_fileno(file), m))
-  #define STAT_STRUCT struct stati64
- #else
-  #define lfs_setmode(L,file,m)   ((void)L, _setmode(_fileno(file), m))
-  #define STAT_STRUCT struct _stati64
- #endif
-#define STAT_FUNC _stati64
-#define LSTAT_FUNC STAT_FUNC
+   #ifdef __BORLANDC__
+    #define lfs_setmode(L,file,m)   ((void)L, setmode(_fileno(file), m))
+    #define STAT_STRUCT struct stati64
+   #else
+    #define lfs_setmode(L,file,m)   ((void)L, _setmode(_fileno(file), m))
+    #define STAT_STRUCT struct _stati64
+   #endif
+  #define STAT_FUNC _stati64
+  #define LSTAT_FUNC STAT_FUNC
+  // _fullpath() is a standard Microsoft function, which somewhat more closely 
+  // resembles realpath() than GetFullPathNameA() does, although it still doesn't 
+  // confirm that the referenced entity either exists, or is accessible.
+  #define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
 #else
-#define _O_TEXT               0
-#define _O_BINARY             0
-#define lfs_setmode(L,file,m)   ((void)L, (void)file, (void)m, 0)
-#define STAT_STRUCT struct stat
-#define STAT_FUNC stat
-#define LSTAT_FUNC lstat
+  #define _O_TEXT               0
+  #define _O_BINARY             0
+  #define lfs_setmode(L,file,m)   ((void)L, (void)file, (void)m, 0)
+  #define STAT_STRUCT struct stat
+  #define STAT_FUNC stat
+  #define LSTAT_FUNC lstat
 #endif
 
 /*
@@ -452,6 +457,26 @@ static int remove_dir (lua_State *L) {
         }
         lua_pushboolean (L, 1);
         return 1;
+}
+
+/*
+** Gets full path name
+** @param #1 Directory path.
+*/
+static int fullpath (lua_State *L) {
+  const char *path = luaL_checkstring (L, 1);
+  
+  char actualpath [PATH_MAX + 1];
+  char *ptr = "aaaa";
+  ptr = realpath(path, actualpath);
+
+  if (ptr == NULL) {
+    lua_pushnil (L);
+    lua_pushfstring (L, "%s", strerror(errno));
+    return 2;
+  }
+  lua_pushlstring (L, ptr, strlen(ptr));
+  return 1;
 }
 
 /*
@@ -869,6 +894,7 @@ static const struct luaL_Reg fslib[] = {
         {"lock", file_lock},
         {"mkdir", make_dir},
         {"rmdir", remove_dir},
+        {"fullpath", fullpath},
         {"symlinkattributes", link_info},
         {"setmode", lfs_f_setmode},
         {"touch", file_utime},
