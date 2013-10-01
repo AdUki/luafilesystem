@@ -4,19 +4,31 @@ T= lfs
 
 CONFIG= ./config
 
-include $(CONFIG)
+# System's libraries directory (where binary libraries are installed)
+LUA_LIBDIR= ../LuaJIT-2.0.2/src
+
+# Lua includes directory
+LUA_INC= ../LuaJIT-2.0.2/src
+
+# OS dependent
+LIB_OPTION= -shared -L $(LUA_LIBDIR) -llua51
+#LIB_OPTION= -bundle -undefined dynamic_lookup #for MacOS X
+
+LIBNAME= $T.dll
+
+# Compilation directives
+WARN= -O2 -Wall -fPIC -W -Waggregate-return -Wcast-align -Wmissing-prototypes -Wnested-externs -Wshadow -Wwrite-strings -pedantic
+INCS= -I$(LUA_INC)
+CFLAGS= $(WARN) $(INCS)
+CC= gcc
 
 SRCS= src/$T.c
 OBJS= src/$T.o
 
-lib: src/lfs.so
+lib: src/lfs.dll
 
-src/lfs.so: $(OBJS)
-	MACOSX_DEPLOYMENT_TARGET="10.3"; export MACOSX_DEPLOYMENT_TARGET; $(CC) $(CFLAGS) $(LIB_OPTION) -o src/lfs.so $(OBJS)
-
-install:
-	mkdir -p $(LUA_LIBDIR)
-	cp src/lfs.so $(LUA_LIBDIR)
+src/lfs.dll: $(OBJS)
+	$(CC) $(CFLAGS) $(LIB_OPTION) -o src/lfs.dll $(OBJS)
 
 clean:
-	rm -f src/lfs.so $(OBJS)
+	rm -f src/lfs.dll $(OBJS)
